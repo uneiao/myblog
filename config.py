@@ -9,3 +9,5 @@ SALT = "salt"
 
 DEBUG = True
 SECRET_KEY = "ss"
+
+PAGE_LEN = 5

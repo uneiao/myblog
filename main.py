@@ -1,9 +1,14 @@
 #! /usr/bin/python
-# -*- coding:utf-8 -*-
+# -*- coding:utf8 -*-
 
 
-from flask import Flask, render_template, \
-    abort, url_for, request, flash, session, redirect
+from datetime import datetime
+import re
+from bson.objectid import ObjectId
+from bs4 import BeautifulSoup as bs4
+
+from flask import Flask, \
+    abort, request, flash, session, redirect
 
 from  model import mdb
 import config
@@ -20,8 +25,11 @@ def index():
     '''
         index
     '''
-    ret = {}
-    return ret
+    _pg = 1
+    posts = mdb.blog.find({})\
+        .sort([('upload_time', -1),]).limit(config.PAGE_LEN)\
+        .skip((_pg - 1) * config.PAGE_LEN)
+    return {'posts': posts}
 
 
 @app.route('/xlogin', endpoint='login')
@@ -72,11 +80,56 @@ def logout():
     return redirect('/')
 
 
+@app.route('/post/<post_id>', endpoint='post')
+@util.blog_wrapper(pat='post.pat')
+def post(post_id):
+    '''
+        post
+    '''
+    _post = mdb.blog.find_one({'_id': ObjectId(post_id)})
+    return {'post': _post}
+
+
 @app.route('/newpost', endpoint='newpost')
-@util.blog_wrapper(pat='index.pat', login_required=True)
+@util.blog_wrapper(pat='newpost.pat', login_required=True)
 def newpost():
     '''
         newpost
+    '''
+    ret = {}
+    return ret
+
+
+@app.route('/do_newpost', endpoint='do_newpost', methods=['POST'])
+@util.blog_wrapper(pat='', login_required=True)
+def do_newpost():
+    '''
+        upload new posts
+    '''
+    title = request.form.get('title')
+    article = request.form.get('article')
+
+    _bdom = bs4(article)
+    summary = re.sub('[\r\n ]+', ' ', \
+        _bdom.get_text())
+    summary = u'%s...' % summary[:40]
+
+    blog_id = mdb.blog.insert({
+        'title': title,
+        'article': article,
+        'summary': summary,
+        'upload_time': datetime.now(),
+        'author': session['owner'],
+    })
+
+    return redirect('/post/%s' % blog_id)
+
+
+@app.route('/about', endpoint='about')
+@util.blog_wrapper(pat='about.pat')
+def about():
+    '''
+        about
     '''
     ret = {}
     return ret
